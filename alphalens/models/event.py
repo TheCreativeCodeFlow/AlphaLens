@@ -37,8 +37,8 @@ class FinancialEvent:
     amount: Optional[float]
     currency: str
     event_date: str
-    settlement_date: Optional[str]
-    status: EventStatus
+    settlement_date: Optional[str] = None
+    status: EventStatus = EventStatus.SETTLED
     linked_event_id: Optional[str] = None
     flexibility: EventFlexibility = EventFlexibility.FIXED
     minimum_allowed_amount: Optional[float] = None
