@@ -1,0 +1,22 @@
+# Challenge agent logs
+log.txt
+
+# Environment and secrets
+.env
+.env.*
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# macOS system files
+.DS_Store
+
+# Datasets and media (per challenge guidelines: do not commit datasets unnecessarily)
+dataset/
+
+# Submission artifacts
+output.csv
+code.zip
