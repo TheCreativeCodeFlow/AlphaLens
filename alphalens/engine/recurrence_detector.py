@@ -142,7 +142,7 @@ class RecurrenceDetector:
                 detected.append(series)
 
             # 2. Regular interval series (groceries, transport, dining every 5, 7, 10, 14, 21 days)
-            elif 4 <= avg_diff <= 25:
+            elif 4 <= avg_diff <= 25 and len(ev_list) >= 3:
                 # Interval series: calculate median positive recent interval
                 recent_pos = [d for d in diffs[-6:] if d > 0]
                 interval = round(statistics.median(recent_pos)) if recent_pos else round(avg_diff)
@@ -233,10 +233,6 @@ class RecurrenceDetector:
                         s.amendment_type = "lease_rent_increase"
                         s.amended_amount = new_amt
                         s.amendment_effective_date = fact.effective_date
-
-        # Exclude non-contractual discretionary spending categories from ongoing recurring commitments
-        discretionary = {"dining", "shopping", "entertainment", "travel"}
-        series_list[:] = [s for s in series_list if s.category not in discretionary]
 
 
     def project_flows(

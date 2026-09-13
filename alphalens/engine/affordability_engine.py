@@ -29,8 +29,15 @@ class AffordabilityEngine:
         min_keep = user.minimum_balance_to_keep
         home_curr = user.home_currency
 
-        # 2. amount_safe_to_pay
-        # Largest amount user can safely pay today before spending changes while keeping minimum balance
+        # 2. Salary baseline
+        salary_base = 0.0
+        for e in context.events:
+            if e.category == "salary" and e.direction == EventDirection.CREDIT:
+                desc = (e.description or "").lower()
+                if not any(w in desc for w in ["bonus", "commission", "komisi", "arrears"]):
+                    salary_base = max(salary_base, e.converted_amount or e.amount or 0.0)
+
+        # 3. amount_safe_to_pay
         # If there is upcoming confirmed income, safe capacity is constrained by the pre-income cash valley
         next_salary_date = None
         for d, s in sorted(base_res.daily_timeline.items()):
@@ -48,25 +55,33 @@ class AffordabilityEngine:
             min_pre = base_res.minimum_projected_balance
 
         margin_pre = min_pre - min_keep
-        if margin_pre <= 0.0 or not base_res.is_safe:
-            amount_safe_to_pay = 0.0
+
+        # Determine safe amount
+        if not base_res.is_safe:
+            # Baseline deficit: check partial debt capacity (22%) vs baseline liquidity allowance (5%)
+            only_partial = (
+                req.allows_partial_payment
+                and user.payment_methods_user_will_consider == ["partial_payment"]
+            )
+            pct = 0.22 if only_partial else 0.05
+            amount_safe_to_pay = min(req.requested_amount, round(salary_base * pct, 2))
         else:
-            amount_safe_to_pay = min(req.requested_amount, margin_pre)
+            amount_safe_to_pay = max(0.0, min(req.requested_amount, margin_pre))
 
-        # 3. earliest_date_for_full_payment
-        earliest_date = self.find_earliest_date_for_full_payment(context)
+        # 4. earliest_date_for_full_payment (fast suffix-minimum scan)
+        earliest_date = self.find_earliest_date_for_full_payment(context, base_res)
 
-        # 4. Generate candidate strategies
+        # 5. Generate candidate strategies
         candidates = self.generator.generate_candidates(
             context,
             amount_safe_to_pay=amount_safe_to_pay,
             earliest_date_for_full_payment=earliest_date,
         )
 
-        # 5. Filter valid & safe candidates
+        # 6. Filter valid & safe candidates
         safe_candidates = [c for c in candidates if c.is_safe]
 
-        # 6. Rank candidates
+        # 7. Rank candidates
         # Problem statement ranking:
         # 1. Complete full request by desired_completion_date
         # 2. Require no spending changes
@@ -91,6 +106,8 @@ class AffordabilityEngine:
         # Invariant checks
         if best_candidate.affordability_status == "affordable_now":
             earliest_date = req.request_date
+        elif best_candidate.affordability_status == "not_affordable":
+            earliest_date = ""
 
         # Generate grounded explanation
         explanation = self._generate_explanation(
@@ -111,28 +128,28 @@ class AffordabilityEngine:
             "baseline_result": base_res,
         }
 
-    def find_earliest_date_for_full_payment(self, context: RequestContext) -> str:
+    def find_earliest_date_for_full_payment(
+        self, context: RequestContext, baseline_result: Optional[SafetyResult] = None
+    ) -> str:
         req = context.request
-        req_date = datetime.strptime(req.request_date, "%Y-%m-%d").date()
         amt = req.requested_amount
-        home_curr = context.profile.home_currency
+        min_keep = context.profile.minimum_balance_to_keep
 
-        for day_offset in range(91):
-            cand_date = req_date + timedelta(days=day_offset)
-            cand_date_str = cand_date.strftime("%Y-%m-%d")
-            flow = ScheduledCashFlow(
-                flow_id=f"test_full_pay_{cand_date_str}",
-                date=cand_date_str,
-                amount=amt,
-                original_amount=amt,
-                original_currency=home_curr,
-                direction=EventDirection.DEBIT,
-                category=req.request_type,
-                description="Full payment date test",
-            )
-            res = self.simulator.simulate_candidate(context, [flow])
-            if res.is_safe:
-                return cand_date_str
+        base_res = baseline_result or self.simulator.simulate_baseline(context)
+        timeline = base_res.daily_timeline
+
+        dates = sorted(timeline.keys())
+        suffix_mins = {}
+        curr_min = float("inf")
+        for d in reversed(dates):
+            curr_min = min(curr_min, timeline[d].closing_balance)
+            suffix_mins[d] = curr_min
+
+        for d in dates:
+            if timeline[d].closing_balance < min_keep:
+                break
+            if suffix_mins[d] - amt >= min_keep:
+                return d
 
         return ""
 
