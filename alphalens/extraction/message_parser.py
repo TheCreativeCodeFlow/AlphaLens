@@ -247,7 +247,12 @@ class MessageParser:
             details["is_confirmed"] = False
             return FactType.PENDING_INCOME, FactStatus.PENDING, details
 
-        # 14. Commission unapproved
+        # 14. Confirmed base salary with unapproved commissions / bonus
+        if ("base salary" in t or "gaji pokok" in t or "regular salary" in t) and amount is not None:
+            details["commission_unapproved"] = True
+            return FactType.SALARY_UPDATE, FactStatus.CONFIRMED, details
+
+        # 14b. Commission unapproved
         if ("commission" in t or "komisi" in t) and ("unapproved" in t or "belum disetujui" in t):
             details["commission_unapproved"] = True
             return FactType.PENDING_INCOME, FactStatus.PENDING, details

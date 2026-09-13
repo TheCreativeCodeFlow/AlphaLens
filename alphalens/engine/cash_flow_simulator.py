@@ -26,16 +26,24 @@ class CashFlowSimulator:
         return self._run_simulation(context, all_flows)
 
     def simulate_candidate(
-        self, context: RequestContext, candidate_flows: List[ScheduledCashFlow]
+        self,
+        context: RequestContext,
+        candidate_flows: List[ScheduledCashFlow],
+        modified_series: Optional[List[RecurringSeries]] = None,
     ) -> SafetyResult:
         """
         Simulates a hypothetical candidate payment plan (e.g. full payment, installments, partial).
         """
-        all_flows = self._collect_all_flows(context, candidate_flows=candidate_flows)
+        all_flows = self._collect_all_flows(
+            context, candidate_flows=candidate_flows, modified_series=modified_series
+        )
         return self._run_simulation(context, all_flows)
 
     def _collect_all_flows(
-        self, context: RequestContext, candidate_flows: List[ScheduledCashFlow]
+        self,
+        context: RequestContext,
+        candidate_flows: List[ScheduledCashFlow],
+        modified_series: Optional[List[RecurringSeries]] = None,
     ) -> List[ScheduledCashFlow]:
         """
         Gathers and normalizes all cash flows across discrete events, recurring series, and candidate flows.
@@ -142,9 +150,12 @@ class CashFlowSimulator:
                     )
 
         # 2. Projected recurring commitments
-        series_list = self.recurrence_detector.detect_series(
-            context.events, req_date_str, context.messages
-        )
+        if modified_series is not None:
+            series_list = modified_series
+        else:
+            series_list = self.recurrence_detector.detect_series(
+                context.events, req_date_str, context.messages
+            )
         existing_scheduled_dates = set((f.date, f.category) for f in discrete_flows)
         recurring_flows = self.recurrence_detector.project_flows(
             series_list=series_list,

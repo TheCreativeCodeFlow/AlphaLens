@@ -6,55 +6,56 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from alphalens.evaluation.evidence_evaluator import EvidenceEvaluator
 from alphalens.evaluation.cash_flow_evaluator import CashFlowEvaluator
+from alphalens.evaluation.decision_evaluator import DecisionEvaluator
 
 
 def main():
-    print("=" * 70)
+    print("=" * 75)
     print("HackerRank Orchestrate: Buy or Wait? — AlphaLens")
-    print("PHASE 2 EVALUATION: FINANCIAL STATE & CASH-FLOW SIMULATION ENGINE")
-    print("=" * 70)
+    print("COMPREHENSIVE MULTI-PHASE SYSTEM EVALUATION (PHASES 1, 2, AND 3)")
+    print("=" * 75)
 
     # 1. Phase 1 Evidence Evaluation
-    print("\n[1/2] Evaluating Data Ingestion & Evidence Layer...")
+    print("\n[1/3] Evaluating Data Ingestion & Evidence Layer...")
     evidence_evaluator = EvidenceEvaluator(dataset_dir="dataset")
     ev_results = evidence_evaluator.evaluate()
 
     # 2. Phase 2 Cash Flow & State Evaluation
-    print("[2/2] Running 90-Day Deterministic Cash Flow Simulation across all requests...")
+    print("\n[2/3] Running 90-Day Deterministic Cash Flow Simulation across all requests...")
     cash_evaluator = CashFlowEvaluator(dataset_dir="dataset")
     cf_results = cash_evaluator.evaluate()
 
-    print(f"\n{'-' * 65}")
-    print("PHASE 2 SIMULATION & STATE METRIC               VALUE")
-    print(f"{'-' * 65}")
+    # 3. Phase 3 Decision Engine Evaluation
+    print("\n[3/3] Evaluating Phase 3 Affordability Decision Engine against Sample Requests...")
+    decision_evaluator = DecisionEvaluator(dataset_dir="dataset")
+    dec_results = decision_evaluator.evaluate()
+
+    print(f"\n{'-' * 70}")
+    print("PHASE 2 & 3 INTEGRATED PERFORMANCE METRIC       VALUE")
+    print(f"{'-' * 70}")
     print(f"Total evaluation & sample requests:             {cf_results['requests_simulated']}")
     print(f"Baseline 90-day forecasts generated:            {cf_results['baseline_forecasts_generated']}")
     print(f"Simulation forecast failures:                   {cf_results['forecast_failures']}")
-    print(f"Baseline minimum-balance breaches detected:     {cf_results['baseline_violations_detected']}")
-    print(f"Projected recurring cash flows generated:       {cf_results['total_projected_flows']}")
-    print(f"Confirmed future income flows recognized:       {cf_results['total_confirmed_income_flows']}")
-    print(f"Pending/uncertain credits properly excluded:    {cf_results['total_pending_income_excluded']}")
-    print(f"Image-derived event amounts incorporated:       {cf_results['image_events_incorporated']}")
-    print(f"Fixed dated currency conversions performed:     {cf_results['foreign_conversions_performed']}")
     print(f"Simulation timeline invariant violations:       {cf_results['invariant_violations']}")
-    print(f"{'-' * 65}")
+    print(f"{'-' * 70}")
+    total_samples = dec_results["total_sample_requests"]
+    fm = dec_results["field_matches"]
+    print(f"Phase 3 Payment Method Recommendation Accuracy: {fm['recommended_payment_method']}/{total_samples} ({fm['recommended_payment_method']/total_samples*100:.1f}%)")
+    print(f"Phase 3 Payment Plan Schedule Accuracy:         {fm['payment_plan']}/{total_samples} ({fm['payment_plan']/total_samples*100:.1f}%)")
+    print(f"Phase 3 Spending Changes Needed Accuracy:       {fm['spending_changes_needed']}/{total_samples} ({fm['spending_changes_needed']/total_samples*100:.1f}%)")
+    print(f"Phase 3 Affordability Status Accuracy:          {fm['affordability_status']}/{total_samples} ({fm['affordability_status']/total_samples*100:.1f}%)")
+    print(f"Phase 3 Earliest Full Payment Date Accuracy:    {fm['earliest_date_for_full_payment']}/{total_samples} ({fm['earliest_date_for_full_payment']/total_samples*100:.1f}%)")
+    print(f"Phase 3 Exact Row Matches (All 6 Fields):       {dec_results['exact_row_matches']}/{total_samples} ({dec_results['exact_row_matches']/total_samples*100:.1f}%)")
+    print(f"{'-' * 70}")
 
-    print("\nSAMPLE REQUEST BASELINE DIAGNOSTICS (25 requests):")
-    print(f"{'-' * 80}")
-    print(f"REQ ID     USER      CUR   CURRENT BAL    PROT MIN   BASE MIN BAL  MIN DATE    STATUS")
-    print(f"{'-' * 80}")
-    for d in cf_results["sample_diagnostics"]:
-        safe_str = "SAFE" if not d["violations"] else f"BREACH({len(d['violations'])}d)"
-        print(
-            f"{d['request_id']:10} {d['user_id']:9} {d['currency']:4} "
-            f"{d['current_balance']:13,f} {d['protected_minimum']:11,f} "
-            f"{d['baseline_minimum_balance']:13,f}  {d['baseline_minimum_date']}  {safe_str}"
-        )
-    print(f"{'-' * 80}")
+    all_passed = (
+        cf_results["status"] == "PASS"
+        and ev_results["validation_passed"]
+        and dec_results["status"] == "PASS"
+    )
 
-    if cf_results["status"] == "PASS" and ev_results["validation_passed"]:
-        print("\nOVERALL STATUS: PASS — Deterministic Financial State & 90-Day Cash Flow Engine operational.")
-        print("Note: Affordability optimization & recommendation ranking will be built in Phase 3.\n")
+    if all_passed:
+        print("\nOVERALL STATUS: PASS — AlphaLens Data Intelligence, Cash-Flow Simulator, and Decision Engine operational.\n")
         return 0
     else:
         print("\nOVERALL STATUS: FAIL — Discrepancies detected.\n")
