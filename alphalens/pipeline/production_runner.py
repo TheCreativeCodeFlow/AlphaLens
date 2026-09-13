@@ -99,6 +99,14 @@ class ProductionRunner:
             writer.writeheader()
             writer.writerows(results)
 
+        # Synchronize root-level output.csv if writing to dataset/output.csv
+        root_out_file = "output.csv"
+        if os.path.abspath(out_file) != os.path.abspath(root_out_file):
+            with open(root_out_file, mode="w", encoding="utf-8", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=REQUIRED_COLUMNS)
+                writer.writeheader()
+                writer.writerows(results)
+
         # 7. Compute file hash
         with open(out_file, mode="rb") as f:
             md5_hash = hashlib.md5(f.read()).hexdigest()
