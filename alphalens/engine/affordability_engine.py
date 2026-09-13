@@ -29,44 +29,25 @@ class AffordabilityEngine:
         min_keep = user.minimum_balance_to_keep
         home_curr = user.home_currency
 
-        # 2. Salary baseline
-        salary_base = 0.0
-        for e in context.events:
-            if e.category == "salary" and e.direction == EventDirection.CREDIT:
-                desc = (e.description or "").lower()
-                if not any(w in desc for w in ["bonus", "commission", "komisi", "arrears"]):
-                    salary_base = max(salary_base, e.converted_amount or e.amount or 0.0)
-
-        # 3. amount_safe_to_pay
-        # If there is upcoming confirmed income, safe capacity is constrained by the pre-income cash valley
-        next_salary_date = None
-        for d, s in sorted(base_res.daily_timeline.items()):
-            if any(f.direction == EventDirection.CREDIT and f.is_confirmed for f in s.flows):
-                next_salary_date = d
-                break
-
-        pre_income_snapshots = [
-            s for d, s in base_res.daily_timeline.items()
-            if (next_salary_date is None or d < next_salary_date)
-        ]
-        if pre_income_snapshots:
-            min_pre = min(s.closing_balance for s in pre_income_snapshots)
-        else:
-            min_pre = base_res.minimum_projected_balance
-
-        margin_pre = min_pre - min_keep
-
-        # Determine safe amount
+        # 2. amount_safe_to_pay
+        # Specification definition (problem_statement.md §Output meaning & §90-Day Safety Check):
+        # "largest amount the user can safely pay on request_date before optional spending changes,
+        # while covering protected expenses and maintaining their minimum balance"
+        # "the most the user can pay today before optional spending changes without breaking the 90-day safety check, capped at requested_amount."
+        #
+        # Mathematical derivation:
+        # If amount A is paid on request_date, the user's closing balance on day t is:
+        #   closing_balance(t) - A >= minimum_balance_to_keep  forall t in [0, 90]
+        #   A <= closing_balance(t) - minimum_balance_to_keep  forall t in [0, 90]
+        #   A <= min_{t} (closing_balance(t) - minimum_balance_to_keep)
+        #
+        # Therefore, if baseline simulation is unsafe (balance breaches min_keep), safe capacity is 0.0.
+        # Otherwise, safe capacity is min(requested_amount, min_{t} closing_balance(t) - min_keep).
         if not base_res.is_safe:
-            # Baseline deficit: check partial debt capacity (22%) vs baseline liquidity allowance (5%)
-            only_partial = (
-                req.allows_partial_payment
-                and user.payment_methods_user_will_consider == ["partial_payment"]
-            )
-            pct = 0.22 if only_partial else 0.05
-            amount_safe_to_pay = min(req.requested_amount, round(salary_base * pct, 2))
+            amount_safe_to_pay = 0.0
         else:
-            amount_safe_to_pay = max(0.0, min(req.requested_amount, margin_pre))
+            net_safe_margin = base_res.minimum_projected_balance - min_keep
+            amount_safe_to_pay = max(0.0, min(req.requested_amount, round(net_safe_margin, 2)))
 
         # 4. earliest_date_for_full_payment (fast suffix-minimum scan)
         earliest_date = self.find_earliest_date_for_full_payment(context, base_res)
